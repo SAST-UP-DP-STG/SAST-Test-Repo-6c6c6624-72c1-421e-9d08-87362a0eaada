@@ -1,0 +1,4 @@
+id,name,email,last4,ssn_last4,role
+1,Dana Admin,admin@internal.example,1337,8421,admin
+2,Jordan Lee,jordan.lee@internal.example,4729,2271,user
+3,Sam Rivera,sam.rivera@internal.example,8890,3004,user

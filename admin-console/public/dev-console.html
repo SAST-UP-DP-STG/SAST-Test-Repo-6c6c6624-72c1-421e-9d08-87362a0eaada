@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Developer Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <h1>Developer Console</h1>
+        <p class="subtitle">Provision API keys for internal integrations.</p>
+      </header>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2>Generate API key</h2>
+            <p class="subtitle">
+              Keys are shown once. Copy and store it securely.
+            </p>
+          </div>
+          <a class="link" href="/">Back to dashboard</a>
+        </div>
+
+        <div class="actions">
+          <button id="generate-btn">Generate key</button>
+          <button id="copy-btn" disabled>Copy</button>
+        </div>
+
+        <div class="message" id="key-message"></div>
+        <div class="key-box muted" id="key-box">
+          <code id="key-value">No key generated yet.</code>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const generateBtn = document.getElementById("generate-btn");
+      const copyBtn = document.getElementById("copy-btn");
+      const keyValue = document.getElementById("key-value");
+      const keyMessage = document.getElementById("key-message");
+      const keyBox = document.getElementById("key-box");
+
+      let currentKey = "";
+      let revealTimer = null;
+
+      function setMessage(text, tone = "info") {
+        keyMessage.textContent = text;
+        keyMessage.className = `message ${tone}`;
+      }
+
+      function clearKey() {
+        currentKey = "";
+        keyValue.textContent = "Key hidden. Generate a new one if needed.";
+        keyBox.classList.add("muted");
+        copyBtn.disabled = true;
+      }
+
+      generateBtn.addEventListener("click", async () => {
+        try {
+          const response = await fetch("/api/dev/generate-key", {
+            method: "POST",
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "Key generation failed.");
+          }
+
+          currentKey = data.apiKey;
+          keyValue.textContent = currentKey;
+          keyBox.classList.remove("muted");
+          copyBtn.disabled = false;
+          setMessage("API key generated. Copy it now.", "success");
+
+          if (revealTimer) {
+            clearTimeout(revealTimer);
+          }
+
+          revealTimer = setTimeout(() => {
+            setMessage("Key hidden for security.", "info");
+            clearKey();
+          }, 15000);
+        } catch (error) {
+          setMessage(error.message, "error");
+        }
+      });
+
+      copyBtn.addEventListener("click", async () => {
+        if (!currentKey) {
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(currentKey);
+          setMessage("Copied to clipboard.", "success");
+        } catch (error) {
+          setMessage("Copy failed. Select and copy manually.", "error");
+        }
+      });
+    </script>
+  </body>
+</html>

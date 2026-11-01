@@ -1,0 +1,249 @@
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h4 mb-1">Users</h1>
+    <div class="text-muted small">Administrative user identity management</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-primary btn-sm" href="/dashboard">Back</a>
+  </div>
+</div>
+
+<div id="alertBox"></div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h6 mb-3">Create User</h2>
+
+        <form id="createUserForm">
+          <div class="mb-2">
+            <label class="form-label small">Full name</label>
+            <input class="form-control" name="fullName" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">Email</label>
+            <input class="form-control" name="email" type="email" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">Phone</label>
+            <input class="form-control" name="phone">
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">National ID</label>
+            <input class="form-control" name="nationalId">
+          </div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small">Role</label>
+              <select class="form-select" name="role">
+                <option value="staff">staff</option>
+                <option value="admin">admin</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small">Status</label>
+              <select class="form-select" name="status">
+                <option value="active">active</option>
+                <option value="disabled">disabled</option>
+              </select>
+            </div>
+          </div>
+          <div class="mt-2">
+            <label class="form-label small">Password (optional)</label>
+            <input class="form-control" name="password" type="text" placeholder="Leave blank to auto-generate">
+          </div>
+
+          <button class="btn btn-primary w-100 mt-3" type="submit">Create</button>
+        </form>
+
+        <div class="mt-3">
+          <button id="exportBtn" class="btn btn-outline-dark w-100" type="button">Export Users (JSON)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h2 class="h6 mb-0">Directory</h2>
+          <button id="refreshBtn" class="btn btn-sm btn-outline-secondary" type="button">Refresh</button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th style="width: 240px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTbody">
+              <% users.forEach(function(u) { %>
+                <tr data-user-id="<%= u.id %>">
+                  <td><%= u.id %></td>
+                  <td><%= u.fullName %></td>
+                  <td><%= u.email %></td>
+                  <td><span class="badge text-bg-secondary"><%= u.role %></span></td>
+                  <td>
+                    <% if (u.status === 'active') { %>
+                      <span class="badge text-bg-success">active</span>
+                    <% } else { %>
+                      <span class="badge text-bg-danger"><%= u.status %></span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <div class="d-flex gap-2">
+                      <select class="form-select form-select-sm roleSelect">
+                        <option value="staff" <%= u.role === 'staff' ? 'selected' : '' %>>staff</option>
+                        <option value="admin" <%= u.role === 'admin' ? 'selected' : '' %>>admin</option>
+                      </select>
+                      <button class="btn btn-sm btn-outline-primary updateRoleBtn" type="button">Update</button>
+                      <% if (u.status === 'active') { %>
+                        <button class="btn btn-sm btn-outline-warning disableBtn" type="button">Disable</button>
+                      <% } else { %>
+                        <button class="btn btn-sm btn-outline-success enableBtn" type="button">Enable</button>
+                      <% } %>
+                      <button class="btn btn-sm btn-outline-danger deleteBtn" type="button">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="small text-muted">
+          Critical endpoints: POST /api/users/create, POST /api/users/update-role, POST /api/users/disable, POST /api/users/enable, POST /api/users/delete, GET /api/users/export
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const alertBox = document.getElementById('alertBox');
+
+  function showAlert(type, text) {
+    alertBox.innerHTML = '<div class="alert alert-' + type + ' alert-dismissible fade show" role="alert">' + String(text) + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>';
+  }
+
+  async function api(path, opts) {
+    const res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts || {}));
+    const ct = res.headers.get('content-type') || '';
+    const body = ct.includes('application/json') ? await res.json() : await res.text();
+    if (!res.ok) {
+      const msg = body && body.error ? body.error : (typeof body === 'string' ? body : 'Request failed');
+      throw new Error(msg);
+    }
+    return body;
+  }
+
+  async function refreshUsers() {
+    const data = await api('/api/users/list');
+    const tbody = document.getElementById('usersTbody');
+    tbody.innerHTML = '';
+    data.users.forEach(u => {
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-user-id', u.id);
+      const statusActionBtn = u.status === 'active'
+        ? '<button class="btn btn-sm btn-outline-warning disableBtn" type="button">Disable</button>'
+        : '<button class="btn btn-sm btn-outline-success enableBtn" type="button">Enable</button>';
+      tr.innerHTML =
+        '<td>' + u.id + '</td>' +
+        '<td>' + (u.fullName || '') + '</td>' +
+        '<td>' + (u.email || '') + '</td>' +
+        '<td><span class="badge text-bg-secondary">' + (u.role || '') + '</span></td>' +
+        '<td>' + (u.status === 'active' ? '<span class="badge text-bg-success">active</span>' : '<span class="badge text-bg-danger">' + (u.status || '') + '</span>') + '</td>' +
+        '<td>' +
+          '<div class="d-flex gap-2">' +
+            '<select class="form-select form-select-sm roleSelect">' +
+              '<option value="staff"' + (u.role === 'staff' ? ' selected' : '') + '>staff</option>' +
+              '<option value="admin"' + (u.role === 'admin' ? ' selected' : '') + '>admin</option>' +
+            '</select>' +
+            '<button class="btn btn-sm btn-outline-primary updateRoleBtn" type="button">Update</button>' +
+            statusActionBtn +
+            '<button class="btn btn-sm btn-outline-danger deleteBtn" type="button">Delete</button>' +
+          '</div>' +
+        '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', async () => {
+    try {
+      await refreshUsers();
+      showAlert('success', 'User list refreshed');
+    } catch (e) {
+      showAlert('danger', e.message);
+    }
+  });
+
+  document.getElementById('createUserForm').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const fd = new FormData(ev.target);
+    const payload = Object.fromEntries(fd.entries());
+    if (!payload.password) delete payload.password;
+    try {
+      const created = await api('/api/users/create', { method: 'POST', body: JSON.stringify(payload) });
+      showAlert('success', 'Created user ID ' + created.id + ' (initialPassword: ' + created.initialPassword + ')');
+      ev.target.reset();
+      await refreshUsers();
+    } catch (e) {
+      showAlert('danger', e.message);
+    }
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', async () => {
+    try {
+      const data = await api('/api/users/export');
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'users-export.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showAlert('success', 'Export downloaded');
+    } catch (e) {
+      showAlert('danger', e.message);
+    }
+  });
+
+  document.getElementById('usersTbody').addEventListener('click', async (ev) => {
+    const btn = ev.target;
+    const tr = btn.closest('tr');
+    if (!tr) return;
+    const userId = Number(tr.getAttribute('data-user-id'));
+    const roleSelect = tr.querySelector('.roleSelect');
+    try {
+      if (btn.classList.contains('updateRoleBtn')) {
+        await api('/api/users/update-role', { method: 'POST', body: JSON.stringify({ userId, role: roleSelect.value }) });
+        showAlert('success', 'Role updated for user ' + userId);
+        await refreshUsers();
+      } else if (btn.classList.contains('disableBtn')) {
+        await api('/api/users/disable', { method: 'POST', body: JSON.stringify({ userId }) });
+        showAlert('success', 'Disabled user ' + userId);
+        await refreshUsers();
+      } else if (btn.classList.contains('enableBtn')) {
+        await api('/api/users/enable', { method: 'POST', body: JSON.stringify({ userId }) });
+        showAlert('success', 'Enabled user ' + userId);
+        await refreshUsers();
+      } else if (btn.classList.contains('deleteBtn')) {
+        await api('/api/users/delete', { method: 'POST', body: JSON.stringify({ userId }) });
+        showAlert('success', 'Deleted user ' + userId);
+        await refreshUsers();
+      }
+    } catch (e) {
+      showAlert('danger', e.message);
+    }
+  });
+</script>

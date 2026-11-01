@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin Console Login</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <h1>Internal Admin Console</h1>
+        <p class="subtitle">Sign in to access internal tools.</p>
+      </header>
+
+      <section class="card">
+        <h2>Sign in</h2>
+        <form id="login-form">
+          <label>
+            Username
+            <input type="text" name="username" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              name="password"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+          <button type="submit">Sign in</button>
+        </form>
+        <div class="message" id="login-message"></div>
+      </section>
+    </div>
+
+    <script>
+      const loginForm = document.getElementById("login-form");
+      const loginMessage = document.getElementById("login-message");
+
+      function setMessage(text, tone = "info") {
+        loginMessage.textContent = text;
+        loginMessage.className = `message ${tone}`;
+      }
+
+      loginForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        loginMessage.textContent = "";
+
+        const formData = new FormData(loginForm);
+        const payload = {
+          username: formData.get("username"),
+          password: formData.get("password"),
+        };
+
+        try {
+          const response = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "Login failed.");
+          }
+
+          sessionStorage.setItem("sessionToken", data.token);
+          sessionStorage.setItem("userName", data.user.name);
+          window.location.href = "/dashboard";
+        } catch (error) {
+          setMessage(error.message, "error");
+        }
+      });
+    </script>
+  </body>
+</html>
